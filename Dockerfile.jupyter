@@ -1,0 +1,59 @@
+# ============================================================================
+# JupyterLab + PySpark Kernel
+# ============================================================================
+# Custom image that bundles JupyterLab with a PySpark kernel pre-configured
+# to connect to the Spark Master running in the Docker Compose stack.
+# ============================================================================
+
+FROM bitnami/spark:3.5.0
+
+USER root
+
+# ---------- System dependencies -------------------------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        gcc \
+        python3-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------- Python packages -----------------------------------------------
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+        jupyterlab==4.0.* \
+        notebook \
+        ipykernel \
+        pyspark==3.5.0 \
+        delta-spark==3.0.0 \
+        pandas \
+        pyarrow \
+        matplotlib \
+        seaborn \
+        scikit-learn \
+        python-dotenv \
+        pyyaml \
+        great-expectations
+
+# ---------- PySpark kernel for Jupyter ------------------------------------
+RUN python3 -m ipykernel install --name pyspark --display-name "PySpark 3.5"
+
+# ---------- Spark defaults ------------------------------------------------
+ENV SPARK_HOME=/opt/bitnami/spark
+ENV PYSPARK_PYTHON=python3
+ENV PYSPARK_DRIVER_PYTHON=python3
+ENV PATH="${SPARK_HOME}/bin:${PATH}"
+
+# ---------- Working directory ---------------------------------------------
+WORKDIR /opt/framework/notebooks
+
+# ---------- Expose JupyterLab port ----------------------------------------
+EXPOSE 8888
+
+# ---------- Entrypoint ----------------------------------------------------
+CMD ["jupyter", "lab", \
+     "--ip=0.0.0.0", \
+     "--port=8888", \
+     "--no-browser", \
+     "--allow-root", \
+     "--NotebookApp.token=governance", \
+     "--notebook-dir=/opt/framework/notebooks"]
