@@ -1,0 +1,199 @@
+# ============================================================================
+# Adaptive Data Governance Framework - .gitignore
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Python
+# ----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.eggs
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+parts/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+MANIFEST
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Mypy / type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# ----------------------------------------------------------------------------
+# PySpark / Spark
+# ----------------------------------------------------------------------------
+spark-warehouse/
+metastore_db/
+derby.log
+*.jar
+*.class
+*.log
+spark-events/
+local-dirs/
+worker/
+
+# Delta Lake
+_delta_log/
+_symlink_format_manifest/
+
+# Checkpoints
+checkpoint/
+checkpoints/
+_checkpoints/
+
+# ----------------------------------------------------------------------------
+# Data Files
+# ----------------------------------------------------------------------------
+*.csv
+*.tsv
+*.parquet
+*.avro
+*.orc
+*.json
+!config/*.json
+*.xlsx
+*.xls
+*.feather
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Data directories (keep structure via .gitkeep)
+data/bronze/*
+data/silver/*
+data/gold/*
+data/raw/*
+data/quarantine/*
+!data/**/.gitkeep
+
+# Models (keep structure via .gitkeep)
+models/*
+!models/.gitkeep
+
+# ----------------------------------------------------------------------------
+# Apache Airflow
+# ----------------------------------------------------------------------------
+airflow/logs/*
+!airflow/logs/.gitkeep
+airflow/*.db
+airflow/*.cfg
+airflow/airflow-webserver.pid
+airflow/standalone_admin_password.txt
+airflow/webserver_config.py
+
+# ----------------------------------------------------------------------------
+# Secrets & Credentials
+# ----------------------------------------------------------------------------
+.env
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# GCP credentials
+*-credentials.json
+*-service-account.json
+service-account*.json
+keyfile*.json
+credentials*.json
+application_default_credentials.json
+
+# AWS (if applicable)
+.aws/
+
+# ----------------------------------------------------------------------------
+# IDEs & Editors
+# ----------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# ----------------------------------------------------------------------------
+# Jupyter Notebooks
+# ----------------------------------------------------------------------------
+.ipynb_checkpoints/
+*.nbconvert.*
+
+# ----------------------------------------------------------------------------
+# OS Files
+# ----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----------------------------------------------------------------------------
+# Docker
+# ----------------------------------------------------------------------------
+docker-compose.override.yml
+.docker/
+
+# ----------------------------------------------------------------------------
+# Miscellaneous
+# ----------------------------------------------------------------------------
+*.bak
+*.tmp
+*.temp
+*.log
+*.out
