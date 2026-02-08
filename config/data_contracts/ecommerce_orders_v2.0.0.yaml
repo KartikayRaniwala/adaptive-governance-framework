@@ -1,0 +1,60 @@
+# ============================================================================
+# Data Contract: E-Commerce Orders
+# ============================================================================
+name: ecommerce_orders
+version: "2.0.0"
+owner: "supply_chain_team"
+description: >
+  Contract for e-commerce order records flowing through the Medallion
+  pipeline.  Enforced at the Bronze → Silver boundary.
+consumers:
+  - "marketing_team"
+  - "finance_team"
+  - "logistics_team"
+
+schema:
+  order_id:
+    type: string
+    nullable: false
+    unique: true
+  customer_id:
+    type: string
+    nullable: false
+  product_id:
+    type: string
+    nullable: false
+  order_value:
+    type: double
+    nullable: false
+    min: 0
+    max: 1000000
+  order_status:
+    type: string
+    nullable: false
+    valid_values:
+      - delivered
+      - shipped
+      - processing
+      - cancelled
+      - returned
+  payment_method:
+    type: string
+    nullable: false
+  order_timestamp:
+    type: timestamp
+    nullable: false
+  delivery_city:
+    type: string
+    nullable: false
+
+rules:
+  - name: positive_order_value
+    type: value_check
+    condition: "order_value > 0"
+  - name: valid_order_status
+    type: value_check
+    condition: "order_status IN ('delivered','shipped','processing','cancelled','returned')"
+
+sla:
+  freshness_hours: 24
+  min_dq_score: 85

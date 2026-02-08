@@ -1,0 +1,51 @@
+# ============================================================================
+# Stress Test Profile: mixed (default)
+# ============================================================================
+# Injects all 8 poison types to validate framework quarantine, alerting,
+# and masking mechanisms.  Used for DSR "Stress Testing" evaluation.
+# ============================================================================
+
+name: "mixed"
+total_records: 50000
+output_format: "parquet"
+output_dir: "data/stress_test"
+seed: 42
+
+poisons:
+  pii_leak:
+    enabled: true
+    pct: 0.08
+    description: "Credit-card numbers & Aadhaar hidden in free-text fields"
+
+  null_spike:
+    enabled: true
+    pct: 0.15
+    columns: ["email", "phone", "order_value", "delivery_pincode"]
+    description: "80% null burst across critical columns"
+
+  schema_break:
+    enabled: true
+    pct: 0.05
+    description: "Extra / missing / wrong-type columns"
+
+  late_data:
+    enabled: true
+    pct: 0.10
+    max_delay_hours: 72
+    description: "Out-of-order timestamps (hours to days late)"
+
+  duplicate_flood:
+    enabled: true
+    pct: 0.10
+    max_copies: 5
+    description: "N-fold exact duplicates to test deduplication"
+
+  format_corrupt:
+    enabled: true
+    pct: 0.05
+    description: "Encoding / delimiter / truncation corruption"
+
+  value_anomaly:
+    enabled: true
+    pct: 0.07
+    description: "Extreme outliers — negative prices, ₹999999 orders"

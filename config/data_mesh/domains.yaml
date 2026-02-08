@@ -1,0 +1,110 @@
+# ============================================================================
+# Data Mesh — Domain & Data Product Definitions
+# ============================================================================
+# Federated governance: each domain owns its data as "products" while
+# adhering to automated global compliance standards.
+# ============================================================================
+
+global_policies:
+  pii_masking:
+    enabled: true
+    strategy: "hash"
+    audit_frequency: "weekly"
+    compliance_framework: "DPDP Act 2023"
+
+  data_retention:
+    bronze_days: 365
+    silver_days: 730
+    gold_days: 1825  # 5 years for aggregated analytics
+    quarantine_days: 90
+
+  quality_thresholds:
+    min_dq_score: 85
+    max_null_rate: 0.05
+    freshness_hours: 24
+
+domains:
+  # ------------------------------------------------------------------
+  # Supply Chain Domain
+  # ------------------------------------------------------------------
+  supply_chain:
+    owner: "supply-chain-team@company.com"
+    description: "Order fulfilment, logistics, and delivery operations"
+    data_products:
+      - name: "orders"
+        location: "data/gold/revenue_aggregates"
+        schema_path: "config/data_contracts/ecommerce_orders_v2.0.0.yaml"
+        sla:
+          freshness_hours: 24
+          min_dq_score: 90
+        tags: ["orders", "revenue", "logistics"]
+
+      - name: "order_items"
+        location: "data/silver/order_items"
+        sla:
+          freshness_hours: 24
+          min_dq_score: 85
+        tags: ["line-items", "products", "quantity"]
+
+  # ------------------------------------------------------------------
+  # Marketing Domain
+  # ------------------------------------------------------------------
+  marketing:
+    owner: "marketing-analytics@company.com"
+    description: "Customer segmentation, personalisation, campaign optimisation"
+    data_products:
+      - name: "customer_rfm"
+        location: "data/gold/customer_rfm"
+        sla:
+          freshness_hours: 48
+          min_dq_score: 85
+        tags: ["rfm", "segmentation", "personalisation"]
+
+      - name: "customer_clv"
+        location: "data/gold/customer_clv"
+        sla:
+          freshness_hours: 48
+          min_dq_score: 85
+        tags: ["clv", "lifetime-value", "retention"]
+
+      - name: "golden_customers"
+        location: "data/gold/golden_customers"
+        sla:
+          freshness_hours: 24
+          min_dq_score: 90
+        tags: ["mdm", "identity-resolution", "golden-record"]
+
+  # ------------------------------------------------------------------
+  # Finance Domain
+  # ------------------------------------------------------------------
+  finance:
+    owner: "finance-analytics@company.com"
+    description: "Revenue reporting, cost analysis, ROI modelling"
+    data_products:
+      - name: "revenue_aggregates"
+        location: "data/gold/revenue_aggregates"
+        sla:
+          freshness_hours: 24
+          min_dq_score: 95
+        tags: ["revenue", "gmv", "reporting"]
+
+  # ------------------------------------------------------------------
+  # Customer Experience Domain
+  # ------------------------------------------------------------------
+  customer_experience:
+    owner: "cx-team@company.com"
+    description: "Customer feedback, churn analysis, satisfaction metrics"
+    data_products:
+      - name: "churn_features"
+        location: "data/gold/churn_features"
+        sla:
+          freshness_hours: 48
+          min_dq_score: 85
+        tags: ["churn", "ml-features", "retention"]
+
+      - name: "reviews"
+        location: "data/silver/reviews"
+        sla:
+          freshness_hours: 24
+          min_dq_score: 80
+        tags: ["reviews", "sentiment", "pii-masked"]

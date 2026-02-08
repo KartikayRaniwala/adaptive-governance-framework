@@ -9,7 +9,7 @@
 # Run:    docker run -p 8888:8888 governance-jupyter
 # ============================================================================
 
-FROM jupyter/pyspark-notebook:latest
+FROM jupyter/pyspark-notebook:spark-3.5.0
 
 # ---------- Switch to root for system package installation ----------------
 USER root
@@ -21,8 +21,8 @@ RUN apt-get update && \
         g++ && \
     rm -rf /var/lib/apt/lists/*
 
-# ---------- Python dependencies from requirements.txt ---------------------
-COPY requirements.txt /tmp/requirements.txt
+# ---------- Python dependencies from requirements.jupyter.txt ---------------
+COPY requirements.jupyter.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
@@ -30,17 +30,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ---------- Switch back to the default notebook user ----------------------
 USER ${NB_UID}
 
-# ---------- Working directory ---------------------------------------------
-WORKDIR /home/jovyan
+# ---------- Working directory (matches volume mount) -------------------------
+WORKDIR /opt/framework
+
+# ---------- Ensure src is importable as a package ----------------------------
+ENV PYTHONPATH=/opt/framework
 
 # ---------- Expose JupyterLab port ----------------------------------------
 EXPOSE 8888
 
-# ---------- Start notebook server (no authentication for dev) -------------
-CMD ["jupyter", "notebook", \
-     "--ip=0.0.0.0", \
-     "--port=8888", \
-     "--no-browser", \
-     "--NotebookApp.token=''", \
-     "--NotebookApp.password=''", \
-     "--notebook-dir=/home/jovyan"]
+# ---------- Start JupyterLab (token controlled by JUPYTER_TOKEN env var) -----
+CMD ["start-notebook.sh", \
+     "--NotebookApp.notebook_dir=/opt/framework/notebooks"]

@@ -42,7 +42,11 @@ from pyspark.sql.types import DoubleType, StringType
 # ---------------------------------------------------------------------------
 import great_expectations as gx
 from great_expectations.core import ExpectationSuite, ExpectationConfiguration
-from great_expectations.dataset import SparkDFDataset
+
+try:
+    from great_expectations.dataset import SparkDFDataset
+except ImportError:
+    SparkDFDataset = None  # GE >= 0.18 removed this; custom validation used
 
 # ---------------------------------------------------------------------------
 # Plotly (HTML report generation)
@@ -206,7 +210,7 @@ class DataQualityFramework:
             suite = ExpectationSuite(expectation_suite_name="ecommerce_order_suite")
 
             # R1 – required columns in order
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_table_columns_to_match_ordered_list",
                     kwargs={"column_list": _EXPECTED_COLUMNS},
@@ -215,7 +219,7 @@ class DataQualityFramework:
             logger.debug("  R1  expect_table_columns_to_match_ordered_list")
 
             # R2 – order_id not null
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_not_be_null",
                     kwargs={"column": "order_id"},
@@ -224,7 +228,7 @@ class DataQualityFramework:
             logger.debug("  R2  expect_column_values_to_not_be_null(order_id)")
 
             # R3 – customer_id not null
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_not_be_null",
                     kwargs={"column": "customer_id"},
@@ -233,7 +237,7 @@ class DataQualityFramework:
             logger.debug("  R3  expect_column_values_to_not_be_null(customer_id)")
 
             # R4 – order_value not null
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_not_be_null",
                     kwargs={"column": "order_value"},
@@ -242,7 +246,7 @@ class DataQualityFramework:
             logger.debug("  R4  expect_column_values_to_not_be_null(order_value)")
 
             # R5 – order_id unique
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_be_unique",
                     kwargs={"column": "order_id"},
@@ -251,7 +255,7 @@ class DataQualityFramework:
             logger.debug("  R5  expect_column_values_to_be_unique(order_id)")
 
             # R6 – order_value between 0 and 1 000 000 (99 % mostly)
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_be_between",
                     kwargs={
@@ -264,14 +268,14 @@ class DataQualityFramework:
             )
             logger.debug(
                 "  R6  expect_column_values_to_be_between(order_value, "
-                "{}-{},{}, mostly={})",
+                "{}-{}, mostly={})",
                 _ORDER_VALUE_MIN,
                 _ORDER_VALUE_MAX,
                 _ORDER_VALUE_MOSTLY,
             )
 
             # R7 – payment_method in allowed set
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_be_in_set",
                     kwargs={
@@ -285,7 +289,7 @@ class DataQualityFramework:
             )
 
             # R8 – delivery_pincode matches 6-digit regex
-            suite.append_expectation(
+            suite.add_expectation(
                 ExpectationConfiguration(
                     expectation_type="expect_column_values_to_match_regex",
                     kwargs={
@@ -371,6 +375,12 @@ class DataQualityFramework:
 
         try:
             # ---- Step 1: wrap in GE SparkDFDataset -----------------------
+            if SparkDFDataset is None:
+                raise RuntimeError(
+                    "great_expectations.dataset.SparkDFDataset is not available "
+                    "in this version of Great Expectations. Use GE < 0.18 or "
+                    "switch to the GX 0.18+ validation API."
+                )
             ge_df = SparkDFDataset(df)
             logger.debug("Wrapped DataFrame in SparkDFDataset.")
 

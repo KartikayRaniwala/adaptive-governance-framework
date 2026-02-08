@@ -1,0 +1,217 @@
+# ============================================================================
+# Adaptive Governance Framework Configuration
+# ============================================================================
+
+project:
+  name: "Adaptive Data Governance Framework"
+  version: "1.0.0"
+  environment: "development"
+
+spark:
+  app_name: "AdaptiveGovernance"
+  master: "spark://spark-master:7077"
+  executor_memory: "4g"
+  executor_cores: 2
+  driver_memory: "2g"
+  sql:
+    warehouse_dir: "/opt/framework/spark-warehouse"
+  delta:
+    enabled: true
+
+storage:
+  type: "local"  # Options: local, s3, gcs, azure
+  base_path: "data"
+  layers:
+    bronze: "data/bronze"
+    silver: "data/silver"
+    gold: "data/gold"
+  delta_lake:
+    log_retention_duration: "interval 30 days"
+    deleted_file_retention_duration: "interval 7 days"
+
+data_quality:
+  enabled: true
+  validation_level: "strict"  # Options: strict, moderate, lenient
+  quarantine_enabled: true
+  quarantine_path: "data/quarantine"
+  metrics_path: "data/metrics"
+
+  expectations:
+    - name: "schema_validation"
+      enabled: true
+    - name: "null_checks"
+      enabled: true
+      threshold: 0.05  # 5% null tolerance
+    - name: "uniqueness_checks"
+      enabled: true
+    - name: "range_validation"
+      enabled: true
+    - name: "referential_integrity"
+      enabled: true
+
+pii_detection:
+  enabled: true
+  model: "distilbert-base-uncased"
+  confidence_threshold: 0.85
+  masking_strategy: "hash"  # Options: hash, redact, tokenize
+  entities:
+    - "PERSON"
+    - "EMAIL"
+    - "PHONE_NUMBER"
+    - "CREDIT_CARD"
+    - "AADHAAR"
+    - "PAN"
+    - "ADDRESS"
+
+  batch_size: 32
+  max_length: 512
+
+compliance:
+  dpdp_enabled: true
+  consent_required: true
+  retention_days: 2555  # 7 years
+  audit_logging: true
+  encryption_at_rest: true
+
+datasets:
+  olist:
+    source: "https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce"
+    tables:
+      - "olist_customers_dataset"
+      - "olist_orders_dataset"
+      - "olist_order_items_dataset"
+      - "olist_products_dataset"
+      - "olist_sellers_dataset"
+
+  amazon_reviews:
+    source: "https://huggingface.co/datasets/amazon_reviews_multi"
+    languages: ["en", "es", "fr"]
+
+  ga360:
+    source: "bigquery-public-data.google_analytics_sample"
+    table: "ga_sessions_*"
+
+medallion:
+  bronze:
+    description: "Raw ingestion layer with full history"
+    retention_days: 90
+    partitioning: "date"
+    optimization: "z-order"
+
+  silver:
+    description: "Validated, deduplicated, PII-masked"
+    retention_days: 365
+    scd_type: 2  # Slowly Changing Dimension Type 2
+
+  gold:
+    description: "Business-ready aggregations"
+    retention_days: 1825  # 5 years
+    aggregation_levels:
+      - "daily"
+      - "weekly"
+      - "monthly"
+
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  metrics:
+    - "data_quality_score"
+    - "pipeline_latency"
+    - "pii_detection_accuracy"
+    - "records_processed"
+    - "quarantine_rate"
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"
+  output: "file"  # console, file, both
+  file_path: "logs/governance.log"
+  rotation: "daily"
+
+# ---------------------------------------------------------------------------
+# Data Contracts (declarative DQ-as-Code)
+# ---------------------------------------------------------------------------
+data_contracts:
+  enabled: true
+  contracts_dir: "config/data_contracts"
+  quarantine_on_failure: true
+  quarantine_path: "data/quarantine/contract_violations"
+  sla_check_interval: "daily"
+
+# ---------------------------------------------------------------------------
+# Data Mesh / Federated Governance
+# ---------------------------------------------------------------------------
+data_mesh:
+  enabled: true
+  catalogue_dir: "config/data_mesh"
+  domains:
+    - "supply_chain"
+    - "marketing"
+    - "finance"
+    - "analytics"
+    - "logistics"
+  seed_default_policies: true
+  global_policies:
+    min_dq_score: 85.0
+    pii_masking_required: true
+    max_freshness_hours: 24
+    encryption_at_rest: true
+    dpdp_retention_days: 2555
+
+# ---------------------------------------------------------------------------
+# Identity Resolution / MDM
+# ---------------------------------------------------------------------------
+identity_resolution:
+  enabled: true
+  blocking_keys:
+    - "email_domain"
+    - "phone_tail"
+    - "soundex_name"
+    - "geo_key"
+  match_thresholds:
+    exact: 1.0
+    high_confidence: 0.85
+    review_required: 0.70
+  weights:
+    name: 0.40
+    email: 0.35
+    phone: 0.25
+  max_resolution_rounds: 10
+  golden_record_strategy: "most_recent"
+  output_path: "data/gold/golden_customers"
+
+# ---------------------------------------------------------------------------
+# Streaming Ingestion
+# ---------------------------------------------------------------------------
+streaming:
+  enabled: true
+  landing_dir: "data/streaming/landing"
+  checkpoint_dir: "data/streaming/_checkpoints"
+  bronze_path: "data/bronze/clickstream"
+  trigger_interval: "10 seconds"
+  max_files_per_trigger: 5
+  pii_mask_on_ingest: true
+
+# ---------------------------------------------------------------------------
+# Stress Testing
+# ---------------------------------------------------------------------------
+stress_test:
+  profiles_dir: "config/stress_test"
+  output_dir: "data/stress_test"
+  default_profile: "mixed"
+  total_records: 10000
+
+# ---------------------------------------------------------------------------
+# Alerting & Schema Drift
+# ---------------------------------------------------------------------------
+alerting:
+  enabled: true
+  on_schema_drift: true
+  on_dq_sla_breach: true
+  on_pii_leak_detected: true
+  quarantine_on_type_change: true
+  channels:
+    - type: "log"
+      level: "WARNING"
+    - type: "webhook"
+      url: ""  # Set in .env

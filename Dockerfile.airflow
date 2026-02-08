@@ -1,0 +1,37 @@
+# ============================================================================
+# Airflow + Framework Dependencies
+# ============================================================================
+# Extends the official Apache Airflow image with the Python packages
+# required by the framework's DAG task callables (PySpark, faker, etc.).
+#
+# Build:  docker build -f Dockerfile.airflow -t governance-airflow .
+# ============================================================================
+
+FROM apache/airflow:2.8.0-python3.10
+
+# ---------- Switch to root for system-level installs -----------------------
+USER root
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        openjdk-17-jre-headless \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Java is required by PySpark — set JAVA_HOME dynamically at build time
+RUN ln -s /usr/lib/jvm/java-17-openjdk-* /usr/lib/jvm/java-17-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# ---------- Switch back to airflow user for pip ----------------------------
+USER airflow
+
+COPY requirements.airflow.txt /tmp/requirements.airflow.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.airflow.txt; \
+    rm -f /tmp/requirements.airflow.txt || true
+
+# ---------- Ensure src is importable --------------------------------------
+ENV PYTHONPATH=/opt/framework

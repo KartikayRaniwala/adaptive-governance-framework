@@ -757,7 +757,7 @@ class DataProfiler:
             df.filter(F.col(col_name).isNotNull())
             .select(
                 F.min(F.length(F.col(col_name))).alias("min_len"),
-                F.max(F.length(F.col_name))).alias("max_len"),
+                F.max(F.length(F.col(col_name))).alias("max_len"),
                 F.avg(F.length(F.col(col_name))).alias("avg_len"),
             )
             .first()
@@ -890,7 +890,7 @@ class DataProfiler:
         ax.invert_yaxis()
 
         for i, v in enumerate(nulls):
-            ax.text(v + 0.3, i, f"{v:.2f}%, va='center', fontsize=8")
+            ax.text(v + 0.3, i, f"{v:.2f}%", va='center', fontsize=8)
 
         plt.tight_layout()
         path = charts_dir / f"{table_name}_null_percentages.png"

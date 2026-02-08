@@ -7,13 +7,11 @@
 #   - Apache Airflow (Webserver + Scheduler + PostgreSQL metadata DB)
 #
 # Usage:
-#   docker-compose up -d            # Start all services
-#   docker-compose down              # Stop all services
-#   docker-compose logs -f <svc>     # Tail logs for a service
-#   docker-compose ps                # List running services
+#   docker compose up -d             # Start all services
+#   docker compose down               # Stop all services
+#   docker compose logs -f <svc>      # Tail logs for a service
+#   docker compose ps                 # List running services
 # ============================================================================
-
-version: "3.8"
 
 # ---------------------------------------------------------------------------
 # Named volumes
@@ -33,7 +31,10 @@ networks:
 # Shared environment anchors (YAML anchors to keep DRY)
 # ---------------------------------------------------------------------------
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.8.0-python3.10
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  image: governance-airflow:latest
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
@@ -42,10 +43,13 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     AIRFLOW__WEBSERVER__RBAC: 'true'
-    # -- Spark connection so DAGs can submit jobs to the cluster ------------
-    SPARK_MASTER_URL: spark://spark-master:7077
+    # -- Spark connection ---------------------------------------------------
+    # Use local[*] so PySpark runs inside Airflow with pip-installed
+    # Delta Lake JARs.  The standalone Spark cluster (spark-master /
+    # spark-worker) is available for JupyterLab interactive work.
+    SPARK_MASTER_URL: "local[*]"
     # -- Project paths inside the container ---------------------------------
-    PYTHONPATH: /opt/framework/src
+    PYTHONPATH: /opt/framework
   volumes: &airflow-common-volumes
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
@@ -55,6 +59,7 @@ x-airflow-common: &airflow-common
     - ./config:/opt/framework/config
     - ./models:/opt/framework/models
     - ./notebooks:/opt/framework/notebooks
+    - ./scripts:/opt/framework/scripts
   networks:
     - governance-net
 
@@ -67,24 +72,27 @@ services:
   # 1. Spark Master
   # =========================================================================
   spark-master:
-    image: bitnami/spark:3.5.0
+    image: apache/spark:3.5.0
     container_name: spark-master
     hostname: spark-master
+    user: root
     ports:
       - "8080:8080"   # Spark Master Web UI
       - "7077:7077"   # Spark Master cluster port
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master --port 7077 --webui-port 8080
     environment:
-      - SPARK_MODE=master
+      - SPARK_HOME=/opt/spark
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
+      - SPARK_NO_DAEMONIZE=true
+      - PYTHONPATH=/opt/framework
     volumes:
       - ./data:/opt/framework/data
       - ./src:/opt/framework/src
+      - ./config:/opt/framework/config
       - ./models:/opt/framework/models
       - ./notebooks:/opt/framework/notebooks
     networks:
@@ -101,24 +109,28 @@ services:
   # 2. Spark Worker
   # =========================================================================
   spark-worker:
-    image: bitnami/spark:3.5.0
+    image: apache/spark:3.5.0
     container_name: spark-worker
     hostname: spark-worker
+    user: root
     depends_on:
       spark-master:
         condition: service_healthy
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --webui-port 8081 --memory 4G --cores 2
     environment:
-      - SPARK_MODE=worker
+      - SPARK_HOME=/opt/spark
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=4G
       - SPARK_WORKER_CORES=2
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
+      - SPARK_NO_DAEMONIZE=true
+      - PYTHONPATH=/opt/framework
     volumes:
       - ./data:/opt/framework/data
       - ./src:/opt/framework/src
+      - ./config:/opt/framework/config
       - ./models:/opt/framework/models
       - ./notebooks:/opt/framework/notebooks
     networks:
@@ -151,13 +163,14 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - PYSPARK_DRIVER_PYTHON=jupyter
       - PYSPARK_DRIVER_PYTHON_OPTS=lab
-      - PYTHONPATH=/opt/framework/src
+      - PYTHONPATH=/opt/framework
     volumes:
       - ./data:/opt/framework/data
       - ./src:/opt/framework/src
       - ./models:/opt/framework/models
       - ./notebooks:/opt/framework/notebooks
       - ./config:/opt/framework/config
+      - ./scripts:/opt/framework/scripts
     networks:
       - governance-net
     restart: unless-stopped

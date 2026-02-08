@@ -1,0 +1,54 @@
+# ============================================================================
+# Data Contract: Customer Profiles
+# ============================================================================
+name: customer_profiles
+version: "1.0.0"
+owner: "marketing_team"
+description: >
+  Contract for customer master data.  PII columns must be masked before
+  reaching Silver layer.  Identity-resolved golden records required.
+consumers:
+  - "supply_chain_team"
+  - "finance_team"
+  - "analytics_team"
+
+schema:
+  customer_id:
+    type: string
+    nullable: false
+    unique: true
+  first_name:
+    type: string
+    nullable: false
+  last_name:
+    type: string
+    nullable: false
+  email:
+    type: string
+    nullable: true
+    regex: "^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$"
+  phone:
+    type: string
+    nullable: true
+  city:
+    type: string
+    nullable: false
+  pincode:
+    type: string
+    nullable: false
+    regex: "^\\d{6}$"
+  consent_marketing:
+    type: boolean
+    nullable: false
+  consent_data_processing:
+    type: boolean
+    nullable: false
+
+rules:
+  - name: consent_required
+    type: value_check
+    condition: "consent_data_processing = true"
+
+sla:
+  freshness_hours: 48
+  min_dq_score: 90
