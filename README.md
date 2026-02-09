@@ -437,6 +437,28 @@ Customer deduplication:
 
 ---
 
+## References
+
+### Foundational Frameworks & Literature
+
+1. **DAMA International** (2017). *DAMA-DMBOK: Data Management Body of Knowledge* (2nd ed.). Technics Publications.
+2. **Dehghani, Z.** (2022). *Data Mesh: Delivering Data-Driven Value at Scale*. O'Reilly Media.
+3. **Chambers, B. & Zaharia, M.** (2018). *Spark: The Definitive Guide — Big Data Processing Made Simple*. O'Reilly Media.
+4. **Harvard Business Review** (2023). "Why Your Data Governance Should Be Adaptive, Not Rigid." *HBR Digital Articles*.
+
+### Regulatory & Industry Reports
+
+5. **Government of India** (2023). *The Digital Personal Data Protection Act, 2023* (DPDP Act). Ministry of Electronics and Information Technology.
+6. **Gartner** (2024). *Magic Quadrant for Augmented Data Quality Solutions*. Gartner Research.
+
+### Technical Documentation & Best Practices
+
+7. **Apache Software Foundation**. *Apache Spark Documentation*. https://spark.apache.org/docs/latest/
+8. **Google Cloud**. *Whitepapers: Best Practices for Retail Analytics*. https://cloud.google.com/whitepapers
+9. **Delta Lake Project**. *Delta Lake Documentation*. https://docs.delta.io/latest/
+
+---
+
 ## License
 
 © 2026 Kartikay Raniwala & Shreenam Tiwari. All rights reserved.
