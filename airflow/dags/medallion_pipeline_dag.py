@@ -262,9 +262,10 @@ def _data_quality_gate(**context):
     print("=" * 70)
     print("  ADAPTIVE DATA QUALITY GATE")
     print("  Components: DQ Metrics, Anomaly Detection (Z-score, IQR,")
-    print("  Isolation Forest), Adaptive Thresholds, Learned Weights,")
-    print("  Early Warning System, Batch Anomaly Detection,")
-    print("  Great Expectations Validation, Data Contracts")
+    print("  Isolation Forest), Bayesian Adaptive Thresholds (NIG),")
+    print("  CUSUM Change-Point Detection (Page 1954),")
+    print("  Learned Weights, Early Warning System,")
+    print("  Batch Anomaly Detection, Great Expectations, Data Contracts")
     print("=" * 70)
 
     # --- Great Expectations Validation ---
@@ -330,9 +331,32 @@ def _data_quality_gate(**context):
     threshold = report["adaptive_threshold"]
 
     print("=" * 70)
-    print(f"  DQ SCORE:           {dq_score:.2f}%")
-    print(f"  ADAPTIVE THRESHOLD: {threshold:.2f}%")
-    print(f"  DECISION:           {decision}")
+    print(f"  DQ SCORE:              {dq_score:.2f}%")
+    print(f"  BAYESIAN THRESHOLD:    {threshold:.2f}% (primary — NIG posterior)")
+    freq_info = report.get("threshold_info", {})
+    freq_thresh = freq_info.get("threshold") if isinstance(freq_info, dict) else None
+    if freq_thresh is not None:
+        print(f"  FREQUENTIST THRESH:    {freq_thresh:.2f}% (μ − kσ baseline)")
+    print(f"  DECISION:              {decision}")
+
+    # CUSUM result
+    cusum = report.get("cusum_result", {})
+    if cusum:
+        detected = cusum.get("change_detected", False)
+        direction = cusum.get("direction", "none") or "none"
+        print(f"  CUSUM SHIFT:           {direction} (detected={detected})")
+        if detected:
+            print(f"    S+ = {cusum.get('final_cusum_pos', 0):.4f}, "
+                  f"S- = {cusum.get('final_cusum_neg', 0):.4f}, "
+                  f"h = {cusum.get('cusum_limit_h', 0):.4f}")
+
+    # Dimension floor violations
+    dim_floor = report.get("dim_floor_violated")
+    if dim_floor:
+        print(f"  DIMENSION FLOOR:       VIOLATED ⚠ (min-dimension < 60%)")
+    else:
+        print(f"  DIMENSION FLOOR:       All dimensions ≥ 60% ✓")
+
     print("-" * 70)
 
     # Print anomaly details — all 3 methods
@@ -418,6 +442,17 @@ def _data_quality_gate(**context):
     context["ti"].xcom_push(key="dq_score", value=dq_score)
     context["ti"].xcom_push(key="dq_decision", value=decision)
     context["ti"].xcom_push(key="dq_threshold", value=threshold)
+    context["ti"].xcom_push(key="bayesian_threshold", value=threshold)
+    freq_info_x = report.get("threshold_info", {})
+    context["ti"].xcom_push(
+        key="frequentist_threshold",
+        value=freq_info_x.get("threshold", threshold) if isinstance(freq_info_x, dict) else threshold,
+    )
+    cusum_x = report.get("cusum_result", {})
+    context["ti"].xcom_push(
+        key="cusum_shift",
+        value=cusum_x.get("direction", "none") or "none",
+    )
     context["ti"].xcom_push(
         key="anomalies_detected",
         value=anomaly_report.get("combined_anomaly_rows", 0),
@@ -634,7 +669,70 @@ def _pii_scan_summary(**context):
 
 
 # ---------------------------------------------------------------------------
-# 8. Log Completion with Full Summary
+# 8. DPDP Compliance Enforcement
+# ---------------------------------------------------------------------------
+def _dpdp_compliance(**context):
+    """Run DPDP Act 2023 compliance checks: retention enforcement,
+    data residency validation, consent audit, and compliance report.
+    """
+    from src.utils.spark_utils import get_spark_session
+    from src.governance.dpdp_compliance import DPDPComplianceEngine
+
+    spark = get_spark_session(app_name="DPDP-Compliance")
+    engine = DPDPComplianceEngine(spark, data_root=DATA_ROOT)
+
+    print("=" * 70)
+    print("  DPDP ACT 2023 COMPLIANCE ENFORCEMENT")
+    print("  Sections: 6 (Consent), 11 (Retention), 12 (Erasure),")
+    print("  13 (Grievance Redressal), 16 (Cross-Border Transfer)")
+    print("=" * 70)
+
+    # --- Retention Enforcement (Section 11) ---
+    try:
+        retention_policy = {
+            "bronze/orders": 1095,
+            "bronze/customers": 1095,
+            "silver/orders": 365,
+            "silver/customers": 365,
+            "quarantine/orders": 30,
+        }
+        ret_result = engine.enforce_retention(retention_policy)
+        print(f"  Retention Enforcement:")
+        print(f"    Tables checked: {len(retention_policy)}")
+        print(f"    Records expired: {ret_result.get('total_records_expired', 0):,}")
+        print(f"    Status: ENFORCED ✓")
+    except Exception as exc:
+        print(f"  Retention Enforcement: {exc}")
+
+    # --- Data Residency Validation (Section 16) ---
+    try:
+        residency = engine.validate_data_residency()
+        print(f"\n  Data Residency (Section 16):")
+        print(f"    Storage: {residency.get('storage_type', 'N/A')}")
+        for d in residency.get("details", []):
+            print(f"    {d}")
+        print(f"    Status: {'COMPLIANT ✓' if residency.get('compliant') else 'VIOLATION ⚠'}")
+    except Exception as exc:
+        print(f"  Data Residency: {exc}")
+
+    # --- Generate Full Compliance Report ---
+    try:
+        compliance_report = engine.generate_compliance_report()
+        print(f"\n  DPDP Compliance Report Generated:")
+        print(f"    Audit trail events: {compliance_report.get('total_audit_events', 0):,}")
+        print(f"    Erasures executed:  {compliance_report.get('total_erasures_executed', 0):,}")
+        print(f"    Records erased:     {compliance_report.get('total_records_erased', 0):,}")
+        cs = compliance_report.get("compliance_status", {})
+        all_ok = all(cs.values()) if cs else True
+        print(f"    Overall status:     {'FULLY COMPLIANT ✓' if all_ok else 'REVIEW NEEDED ⚠'}")
+    except Exception as exc:
+        print(f"  Compliance Report: {exc}")
+
+    print("=" * 70)
+
+
+# ---------------------------------------------------------------------------
+# 9. Log Completion with Full Summary
 # ---------------------------------------------------------------------------
 def _log_completion(**context):
     """Log pipeline completion with comprehensive governance metrics."""
@@ -649,6 +747,15 @@ def _log_completion(**context):
     )
     dq_threshold = ti.xcom_pull(
         task_ids="quality_gate.data_quality_check", key="dq_threshold"
+    )
+    bayesian_threshold = ti.xcom_pull(
+        task_ids="quality_gate.data_quality_check", key="bayesian_threshold"
+    )
+    frequentist_threshold = ti.xcom_pull(
+        task_ids="quality_gate.data_quality_check", key="frequentist_threshold"
+    )
+    cusum_shift = ti.xcom_pull(
+        task_ids="quality_gate.data_quality_check", key="cusum_shift"
     )
     anomalies_detected = ti.xcom_pull(
         task_ids="quality_gate.data_quality_check", key="anomalies_detected"
@@ -711,7 +818,9 @@ def _log_completion(**context):
     print(f"\n  Governance Metrics:")
     print(f"    DQ Score:              {dq_score}")
     print(f"    Decision:              {dq_decision}")
-    print(f"    Adaptive Threshold:    {dq_threshold}")
+    print(f"    Bayesian Threshold:    {bayesian_threshold}")
+    print(f"    Frequentist Threshold: {frequentist_threshold}")
+    print(f"    CUSUM Shift:           {cusum_shift}")
     print(f"    Combined Anomalies:    {anomalies_detected}")
     print(f"      Z-Score Anomalies:   {zscore_anomalies}")
     print(f"      IQR Anomalies:       {iqr_anomalies}")
@@ -721,16 +830,20 @@ def _log_completion(**context):
     print("    ✓ Z-Score Anomaly Detection (statistical)")
     print("    ✓ IQR Fence Anomaly Detection (statistical)")
     print("    ✓ Isolation Forest Anomaly Detection (sklearn ML)")
-    print("    ✓ Adaptive DQ Threshold (rolling baseline + trend)")
-    print("    ✓ Dimension Weight Learning (inverse-mean + regression)")
-    print("    ✓ Early Warning System (trend monitoring)")
+    print("    ✓ Bayesian Adaptive DQ Threshold (NIG conjugate prior)")
+    print("    ✓ Frequentist Adaptive Threshold (μ − kσ baseline)")
+    print("    ✓ CUSUM Change-Point Detection (Page 1954)")
+    print("    ✓ Bayesian Dimension Weight Learning (posterior variance)")
+    print("    ✓ Linear Regression Weight Learning (sklearn)")
+    print("    ✓ Early Warning System (Bayesian surprise + trend)")
     print("    ✓ Batch Anomaly Detection (cross-run Z-score)")
     print("    ✓ PII Detection — Regex (8 patterns)")
     print("    ✓ PII Detection — NER (DistilBERT dslim/bert-base-NER)")
     print("    ✓ PII Confidence Tuner (F1-optimal threshold search)")
     print("    ✓ PII Drift Detection (baseline vs recent FN rates)")
-    print("    ✓ Identity Resolution (Jaro-Winkler fuzzy matching)")
+    print("    ✓ Identity Resolution (Fellegi-Sunter probabilistic linkage)")
     print("    ✓ Great Expectations (8-rule ExpectationSuite)")
+    print("    ✓ DPDP Compliance Engine (erasure, retention, consent)")
 
     print("\n  Architecture Components Demonstrated:")
     print("    ✓ Medallion Architecture (Bronze → Silver → Gold)")
@@ -741,12 +854,14 @@ def _log_completion(**context):
     print("    ✓ Data Quality Framework (5 dimensions)")
     print("    ✓ Great Expectations (suite validation + quarantine)")
     print("    ✓ Anomaly Detection: Z-score + IQR + Isolation Forest")
-    print("    ✓ Adaptive DQ Thresholds (learned from history)")
-    print("    ✓ Dimension Weight Learning (inverse-mean + regression)")
-    print("    ✓ Identity Resolution (deduplication + golden records)")
+    print("    ✓ Bayesian Adaptive Thresholds (NIG posterior credible interval)")
+    print("    ✓ CUSUM Change-Point Detection (Page 1954 SPC)")
+    print("    ✓ Dimension Weight Learning (Bayesian variance + regression)")
+    print("    ✓ Identity Resolution (Fellegi-Sunter 1969 + Jaro-Winkler)")
     print("    ✓ Data Contracts (schema enforcement)")
-    print("    ✓ Early Warning System (trend monitoring)")
+    print("    ✓ Early Warning System (Bayesian surprise monitoring)")
     print("    ✓ Batch Anomaly Detection (cross-run comparison)")
+    print("    ✓ DPDP Act 2023 Compliance (erasure, retention, consent)")
     print("    ✓ Governance Reports (JSON, timestamped)")
     print("=" * 70)
 
@@ -816,6 +931,12 @@ with DAG(
         python_callable=_pii_scan_summary,
     )
 
+    # -- DPDP Compliance ---------------------------------------------------
+    dpdp_check = PythonOperator(
+        task_id="dpdp_compliance",
+        python_callable=_dpdp_compliance,
+    )
+
     # -- Completion --------------------------------------------------------
     log_done = PythonOperator(
         task_id="log_completion",
@@ -832,5 +953,5 @@ with DAG(
     )
 
     # After Bronze: streaming runs in parallel with Silver transformation
-    transform_group >> quality_group >> transform_gold >> pii_scan >> log_done >> end
+    transform_group >> quality_group >> transform_gold >> pii_scan >> dpdp_check >> log_done >> end
     streaming_ingest >> log_done

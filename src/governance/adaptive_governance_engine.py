@@ -8,9 +8,16 @@
 # together every AI/ML component into a single orchestration layer:
 #
 #   1. Anomaly Detection (Z-score, IQR, Isolation Forest)
-#   2. Adaptive DQ Scoring (dynamic thresholds, learned weights)
+#   2. Bayesian Adaptive DQ Scoring (NIG posterior thresholds, CUSUM)
 #   3. PII Confidence Tuning (feedback-driven F1 optimisation)
-#   4. Self-Learning Feedback Loop (records outcomes, retrains)
+#   4. DPDP Act 2023 Compliance Enforcement
+#   5. Self-Learning Feedback Loop (records outcomes, retrains)
+#
+# Novel contributions:
+#   - Bayesian NIG conjugate model for threshold adaptation
+#   - CUSUM change-point detection (Page, 1954) for DQ drift
+#   - Fellegi-Sunter probabilistic identity resolution
+#   - Cascading erasure pipeline for DPDP Section 12
 #
 # The engine is invoked by the Airflow DQ gate task instead of a
 # hard-coded threshold check.
@@ -62,7 +69,9 @@ class AdaptiveGovernanceEngine:
         # Lazy-init sub-components
         self._anomaly_detector = None
         self._adaptive_scorer = None
+        self._bayesian_scorer = None
         self._pii_tuner = None
+        self._dpdp_engine = None
 
     # ------------------------------------------------------------------
     # Lazy component initialisation
@@ -93,6 +102,17 @@ class AdaptiveGovernanceEngine:
         return self._adaptive_scorer
 
     @property
+    def bayesian_scorer(self):
+        if self._bayesian_scorer is None:
+            from src.quality.bayesian_scorer import BayesianDQScorer
+            self._bayesian_scorer = BayesianDQScorer(
+                history_dir=f"{self.data_root}/metrics/adaptive",
+                prior_mean=self._cfg.get("prior_mean", 85.0),
+                prior_strength=self._cfg.get("prior_strength", 3.0),
+            )
+        return self._bayesian_scorer
+
+    @property
     def pii_tuner(self):
         if self._pii_tuner is None:
             from src.pii_detection.adaptive_pii_tuner import AdaptivePIITuner
@@ -100,6 +120,16 @@ class AdaptiveGovernanceEngine:
                 feedback_dir=f"{self.data_root}/metrics/pii_feedback",
             )
         return self._pii_tuner
+
+    @property
+    def dpdp_engine(self):
+        if self._dpdp_engine is None:
+            from src.governance.dpdp_compliance import DPDPComplianceEngine
+            self._dpdp_engine = DPDPComplianceEngine(
+                spark=self.spark,
+                data_root=self.data_root,
+            )
+        return self._dpdp_engine
 
     # ------------------------------------------------------------------
     # Main evaluation entry point
@@ -208,12 +238,17 @@ class AdaptiveGovernanceEngine:
             ),
         }
 
-        # ---- Step 3: Adaptive threshold ----
+        # ---- Step 3: Adaptive threshold (dual: frequentist + Bayesian) ----
         threshold_info = self.adaptive_scorer.compute_adaptive_threshold(label)
-        adaptive_threshold = threshold_info["threshold"]
+        bayesian_info = self.bayesian_scorer.compute_adaptive_threshold(label)
+        # Use Bayesian threshold as primary (more principled)
+        adaptive_threshold = bayesian_info["threshold"]
 
-        # ---- Step 4: Early warning ----
-        early_warning = self.adaptive_scorer.check_early_warning(
+        # ---- Step 3b: CUSUM change-point detection ----
+        cusum_result = self.bayesian_scorer.cusum_detect(label)
+
+        # ---- Step 4: Early warning (Bayesian) ----
+        early_warning = self.bayesian_scorer.check_early_warning(
             overall_score, label
         )
 
@@ -222,8 +257,9 @@ class AdaptiveGovernanceEngine:
             dq_metrics, label
         )
 
-        # ---- Step 6: Record run for learning ----
+        # ---- Step 6: Record run for learning (both scorers) ----
         self.adaptive_scorer.record_run(dq_metrics, label)
+        self.bayesian_scorer.record_run(dq_metrics, label)
 
         # ---- Step 7: PII drift check ----
         try:
@@ -246,9 +282,17 @@ class AdaptiveGovernanceEngine:
             logger.warning("Regression weight learning skipped: {}", exc)
             regression_weights = {}
 
-        # ---- Step 10: Decision ----
+        # ---- Step 10: Decision (multi-signal) ----
+        # Hard floor: no dimension below 60% (addresses dimension compensation)
+        dim_scores = dq_metrics.get("dimensions", {})
+        dim_floor_violated = any(v < 60.0 for v in dim_scores.values()) if dim_scores else False
+
         if overall_score < adaptive_threshold:
             decision = "FAIL"
+        elif dim_floor_violated:
+            decision = "FAIL"
+        elif cusum_result.get("change_detected") and cusum_result.get("direction") == "downward_shift":
+            decision = "WARN"
         elif early_warning.get("alert_level") in ("warning", "critical"):
             decision = "WARN"
         elif batch_anomaly.get("is_anomaly"):
@@ -264,12 +308,15 @@ class AdaptiveGovernanceEngine:
             "dq_metrics": dq_metrics,
             "anomaly_report": anomaly_report,
             "threshold_info": threshold_info,
+            "bayesian_threshold": bayesian_info,
+            "cusum_result": cusum_result,
             "learned_weights": learned_weights,
             "regression_weights": regression_weights,
             "early_warning": early_warning,
             "batch_anomaly": batch_anomaly,
             "pii_drift": pii_drift,
             "pii_thresholds": pii_thresholds,
+            "dim_floor_violated": dim_floor_violated,
             "timestamp": datetime.now().isoformat(),
         }
 

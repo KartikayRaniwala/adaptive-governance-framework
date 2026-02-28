@@ -384,15 +384,19 @@ class AdaptivePIITuner:
     def _load_feedback(self) -> List[Dict]:
         path = self._feedback_file()
         if path.exists():
-            with open(path) as f:
-                return json.load(f)
+            try:
+                with open(path) as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                # Corrupt file from a prior crash — start fresh
+                return []
         return []
 
     def _save_feedback(self, feedback: List[Dict]) -> None:
         # Keep at most 10 000 events
         feedback = feedback[-10_000:]
         with open(self._feedback_file(), "w") as f:
-            json.dump(feedback, f, indent=2)
+            json.dump(feedback, f, indent=2, default=lambda o: float(o) if hasattr(o, 'item') else str(o))
 
     def _save_tuned_thresholds(self, thresholds: Dict[str, float]) -> None:
         path = self.feedback_dir / "tuned_thresholds.json"

@@ -168,29 +168,29 @@ class PIIDetector:
                 seen_spans = set()
                 for chunk_offset, chunk_text in chunks:
                     ner_results = self._ner_pipeline(chunk_text)
-                for ent in ner_results:
-                    # Use adaptive per-entity threshold if available
-                    _ent_thresh = self._adaptive_thresholds.get(
-                        "PERSON", self.confidence_threshold,
-                    )
-                    if (
-                            ent["entity_group"] == "PER"
-                            and ent["score"] >= _ent_thresh
-                        ):
-                            abs_start = chunk_offset + ent["start"]
-                            abs_end = chunk_offset + ent["end"]
-                            span_key = (abs_start, abs_end)
-                            if span_key not in seen_spans:
-                                seen_spans.add(span_key)
-                                entities.append(
-                                    PIIEntity(
-                                        entity_type="PERSON",
-                                        text=ent["word"],
-                                        start=abs_start,
-                                        end=abs_end,
-                                        score=round(ent["score"], 4),
+                    for ent in ner_results:
+                        # Use adaptive per-entity threshold if available
+                        _ent_thresh = self._adaptive_thresholds.get(
+                            "PERSON", self.confidence_threshold,
+                        )
+                        if (
+                                ent["entity_group"] == "PER"
+                                and ent["score"] >= _ent_thresh
+                            ):
+                                abs_start = chunk_offset + ent["start"]
+                                abs_end = chunk_offset + ent["end"]
+                                span_key = (abs_start, abs_end)
+                                if span_key not in seen_spans:
+                                    seen_spans.add(span_key)
+                                    entities.append(
+                                        PIIEntity(
+                                            entity_type="PERSON",
+                                            text=ent["word"],
+                                            start=abs_start,
+                                            end=abs_end,
+                                            score=round(ent["score"], 4),
+                                        )
                                     )
-                                )
             except Exception as exc:
                 logger.error("NER inference error: {}", exc)
 

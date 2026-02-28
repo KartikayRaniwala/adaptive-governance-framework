@@ -34,6 +34,7 @@ pyyaml==6.0.1
 python-dotenv==1.0.0
 tqdm==4.66.1
 scikit-learn==1.3.2
+scipy==1.11.4
 
 # -- Visualization (used by data_profiler & dq_framework) -------------------
 matplotlib==3.8.2
