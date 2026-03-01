@@ -136,20 +136,16 @@ class DataProfiler:
     orders_raw 50000
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     # ------------------------------------------------------------------ init
     def __init__(self, spark: SparkSession) -> None:
         self.spark = spark
 
         # ---- Loguru setup -------------------------------------------------
-        log_dir = Path("logs")
-        try:
-            log_dir.mkdir(parents=True, exist_ok=True)
-            # verify we can actually write
-            _test = log_dir / ".write_test"
-            _test.touch(); _test.unlink()
-        except OSError:
-            log_dir = Path("/tmp/logs")
-            log_dir.mkdir(parents=True, exist_ok=True)
+        log_dir = self._FRAMEWORK_ROOT / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
 
         logger.remove()
         logger.add(

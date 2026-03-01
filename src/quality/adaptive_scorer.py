@@ -54,6 +54,9 @@ class AdaptiveDQScorer:
         (default 99.0).
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(
         self,
         history_dir: str = "data/metrics/adaptive",
@@ -62,7 +65,8 @@ class AdaptiveDQScorer:
         min_threshold: float = 70.0,
         max_threshold: float = 99.0,
     ):
-        self.history_dir = Path(history_dir)
+        _p = Path(history_dir)
+        self.history_dir = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.history_dir.mkdir(parents=True, exist_ok=True)
         self.baseline_window = baseline_window
         self.sensitivity = sensitivity

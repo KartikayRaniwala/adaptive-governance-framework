@@ -34,13 +34,17 @@ class QualityMetrics:
         Directory where metric snapshots are saved.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(
         self,
         spark: SparkSession,
         metrics_path: str = "data/metrics",
     ):
         self.spark = spark
-        self.metrics_path = Path(metrics_path)
+        _p = Path(metrics_path)
+        self.metrics_path = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.metrics_path.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------

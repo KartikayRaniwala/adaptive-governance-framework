@@ -36,12 +36,16 @@ class EvaluationFramework:
     studies, and statistical significance testing.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(
         self,
         output_dir: str = "data/evaluation",
         random_seed: int = 42,
     ):
-        self.output_dir = Path(output_dir)
+        _p = Path(output_dir)
+        self.output_dir = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.seed = random_seed
         np.random.seed(random_seed)

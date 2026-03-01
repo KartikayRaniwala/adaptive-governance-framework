@@ -91,6 +91,9 @@ class AdaptivePIITuner:
         threshold adjustment begins.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(
         self,
         feedback_dir: str = "data/metrics/pii_feedback",
@@ -99,7 +102,8 @@ class AdaptivePIITuner:
         max_threshold: float = 0.99,
         min_feedback_count: int = 20,
     ):
-        self.feedback_dir = Path(feedback_dir)
+        _p = Path(feedback_dir)
+        self.feedback_dir = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.feedback_dir.mkdir(parents=True, exist_ok=True)
         self.default_threshold = default_threshold
         self.min_threshold = min_threshold

@@ -162,8 +162,12 @@ class DataMeshGovernor:
         definitions as JSON files.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(self, catalogue_dir: str = "config/data_mesh"):
-        self.catalogue_dir = Path(catalogue_dir)
+        _p = Path(catalogue_dir)
+        self.catalogue_dir = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.catalogue_dir.mkdir(parents=True, exist_ok=True)
 
         self._domains: Dict[str, Dict[str, Any]] = {}

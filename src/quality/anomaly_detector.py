@@ -50,6 +50,9 @@ class AnomalyDetector:
         that thresholds can be compared across pipeline runs.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(
         self,
         spark: SparkSession,
@@ -62,9 +65,12 @@ class AnomalyDetector:
         self.z_threshold = z_threshold
         self.iqr_factor = iqr_factor
         self.contamination = contamination
-        self.history_path = Path(history_path) if history_path else None
-        if self.history_path:
+        if history_path:
+            _p = Path(history_path)
+            self.history_path = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
             self.history_path.mkdir(parents=True, exist_ok=True)
+        else:
+            self.history_path = None
 
     # ------------------------------------------------------------------
     # Z-Score anomaly detection

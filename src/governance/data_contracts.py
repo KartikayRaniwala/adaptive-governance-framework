@@ -122,8 +122,12 @@ class ContractRegistry:
     Persists contracts as YAML files under ``contracts_dir``.
     """
 
+    # Framework root so relative paths resolve correctly from any CWD
+    _FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
+
     def __init__(self, contracts_dir: str = "config/data_contracts"):
-        self.contracts_dir = Path(contracts_dir)
+        _p = Path(contracts_dir)
+        self.contracts_dir = _p if _p.is_absolute() else self._FRAMEWORK_ROOT / _p
         self.contracts_dir.mkdir(parents=True, exist_ok=True)
         self._contracts: Dict[str, DataContract] = {}
         self._load_all()
