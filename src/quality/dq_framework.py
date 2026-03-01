@@ -127,7 +127,9 @@ class DataQualityFramework:
         self.spark = spark
 
         # ---- Loguru setup -------------------------------------------------
-        log_dir = Path("logs")
+        # Use framework base path so it works from any CWD (e.g. Jupyter)
+        _framework_root = Path(__file__).resolve().parents[2]
+        log_dir = _framework_root / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         logger.remove()  # clear default stderr handler

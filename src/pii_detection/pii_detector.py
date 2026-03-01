@@ -58,6 +58,9 @@ _REGEX_PATTERNS: Dict[str, re.Pattern] = {
     "IFSC": re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b"),
 }
 
+# Public alias so notebooks can do: from src.pii_detection.pii_detector import PII_PATTERNS
+PII_PATTERNS = _REGEX_PATTERNS
+
 
 # ============================================================================
 # PIIDetector
