@@ -90,21 +90,27 @@ class QualityMetrics:
         df: DataFrame,
         rules: Dict[str, str],
     ) -> Dict[str, float]:
-        """Fraction of rows matching a regex pattern per column.
+        """Fraction of rows satisfying each validity rule.
 
         Parameters
         ----------
         rules : dict[str, str]
-            ``{column: regex_pattern}``
+            ``{rule_name: sql_condition}``  — each *sql_condition* is a
+            Spark SQL expression that evaluates to boolean, e.g.
+            ``"order_value >= 0"`` or ``"order_id IS NOT NULL"``.
         """
         total = df.count()
         if total == 0:
-            return {c: 0.0 for c in rules}
+            return {name: 0.0 for name in rules}
 
         result = {}
-        for col, pattern in rules.items():
-            valid = df.filter(F.col(col).rlike(pattern)).count()
-            result[col] = round(valid / total * 100, 2)
+        for name, condition in rules.items():
+            try:
+                valid = df.filter(F.expr(condition)).count()
+                result[name] = round(valid / total * 100, 2)
+            except Exception as exc:
+                logger.error("Validity rule '{}' failed: {}", name, exc)
+                result[name] = 0.0
         return result
 
     @staticmethod
