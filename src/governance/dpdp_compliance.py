@@ -353,7 +353,8 @@ class DPDPComplianceEngine:
                 event["_audit_file"] = f.name
                 results.append(event)
 
-            except Exception:
+            except Exception as exc:
+                logger.warning("Skipping corrupted audit file {}: {}", f.name, exc)
                 continue
 
         return results
@@ -408,7 +409,7 @@ class DPDPComplianceEngine:
                     try:
                         from delta.tables import DeltaTable
                         dt = DeltaTable.forPath(self.spark, str(table_dir))
-                        dt.vacuum(retentionHours=0)
+                        dt.vacuum(retentionHours=168)  # 7-day safety retention
                         logger.debug("VACUUM completed: {}", table_dir)
                     except Exception as exc:
                         logger.debug("VACUUM skipped for {}: {}", table_dir, exc)

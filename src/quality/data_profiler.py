@@ -147,17 +147,19 @@ class DataProfiler:
         log_dir = self._FRAMEWORK_ROOT / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.remove()
-        logger.add(
-            sys.stderr,
-            level="INFO",
-            format=(
-                "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                "<level>{level:<8}</level> | "
-                "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
-                " - <level>{message}</level>"
-            ),
-        )
+        if not getattr(logger, '_data_profiler_configured', False):
+            logger.remove()  # remove default stderr handler only on first init
+            logger._data_profiler_configured = True
+            logger.add(
+                sys.stderr,
+                level="INFO",
+                format=(
+                    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+                    "<level>{level:<8}</level> | "
+                    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
+                    " - <level>{message}</level>"
+                ),
+            )
         logger.add(
             str(log_dir / "data_profiling.log"),
             rotation="10 MB",

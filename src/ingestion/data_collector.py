@@ -89,7 +89,9 @@ class DataCollector:
         # Loguru – rotating file sink
         log_dir = Path("logs")
         log_dir.mkdir(parents=True, exist_ok=True)
-        logger.remove()  # remove default stderr handler
+        if not getattr(logger, '_data_collector_configured', False):
+            logger.remove()  # remove default stderr handler only on first init
+            logger._data_collector_configured = True
         logger.add(
             sys.stderr,
             level="INFO",

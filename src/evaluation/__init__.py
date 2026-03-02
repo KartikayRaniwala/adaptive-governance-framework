@@ -104,7 +104,7 @@ class EvaluationFramework:
         results["strategies"]["frequentist_mu_ksigma"] = {
             "threshold_type": "frequentist_adaptive",
             "decisions": freq_decisions,
-            "pass_rate": sum(1 for d in freq_decisions if d == "PASS") / n,
+            "pass_rate": (sum(1 for d in freq_decisions if d == "PASS") / n) if n else 0.0,
             "thresholds_over_time": freq_thresholds,
             "parameters": {"window": window, "k": k},
         }
@@ -127,7 +127,7 @@ class EvaluationFramework:
         results["strategies"]["bayesian_nig"] = {
             "threshold_type": "bayesian_adaptive",
             "decisions": bayes_decisions,
-            "pass_rate": sum(1 for d in bayes_decisions if d == "PASS") / n,
+            "pass_rate": (sum(1 for d in bayes_decisions if d == "PASS") / n) if n else 0.0,
             "thresholds_over_time": bayes_thresholds,
             "parameters": {
                 "prior_mean": 85.0, "prior_strength": 3.0,

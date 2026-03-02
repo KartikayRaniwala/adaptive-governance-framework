@@ -132,17 +132,19 @@ class DataQualityFramework:
         log_dir = _framework_root / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.remove()  # clear default stderr handler
-        logger.add(
-            sys.stderr,
-            level="INFO",
-            format=(
-                "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-                "<level>{level:<8}</level> | "
-                "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
-                " - <level>{message}</level>"
-            ),
-        )
+        if not getattr(logger, '_dq_framework_configured', False):
+            logger.remove()  # clear default stderr handler only on first init
+            logger._dq_framework_configured = True
+            logger.add(
+                sys.stderr,
+                level="INFO",
+                format=(
+                    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+                    "<level>{level:<8}</level> | "
+                    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
+                    " - <level>{message}</level>"
+                ),
+            )
         logger.add(
             str(log_dir / "data_quality.log"),
             rotation="10 MB",

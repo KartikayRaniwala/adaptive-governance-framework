@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 # ============================================================================
