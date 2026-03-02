@@ -106,6 +106,11 @@ class QualityMetrics:
         result = {}
         for name, condition in rules.items():
             try:
+                # Auto-detect bare regex patterns (e.g. ^\d{6}$) and
+                # wrap them in an RLIKE expression targeting the rule's
+                # column name.  This keeps callers simple.
+                if condition.startswith("^") or condition.endswith("$"):
+                    condition = f"{name} RLIKE '{condition}'"
                 valid = df.filter(F.expr(condition)).count()
                 result[name] = round(valid / total * 100, 2)
             except Exception as exc:

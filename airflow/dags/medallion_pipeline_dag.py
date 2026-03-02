@@ -683,7 +683,7 @@ def _data_quality_gate(**context):
         df=silver_orders,
         label="silver_orders",
         required_columns=["order_id", "customer_id", "order_value"],
-        validity_rules={"delivery_pincode": r"^\d{6}$"},
+        validity_rules={"delivery_pincode": "delivery_pincode RLIKE '^[0-9]{6}$'"},
         numeric_columns=["order_value"],
     )
 
