@@ -13,10 +13,52 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
 from loguru import logger
+
+
+# ---------------------------------------------------------------------------
+# Pipeline mode — toggle from Airflow UI  (Admin → Variables)
+#   Variable name : demo_mode
+#   Value         : true   → fast demo  (~3-5 min)
+#                   false  → full-scale  (~35 min)
+# ---------------------------------------------------------------------------
+def _is_demo_mode() -> bool:
+    """Read the Airflow Variable 'demo_mode' at task execution time."""
+    raw = Variable.get("demo_mode", default_var="true")
+    return raw.strip().lower() in ("true", "1", "yes")
+
+
+def _get_pipeline_config() -> dict:
+    """Return counts / sizes according to pipeline mode."""
+    demo = _is_demo_mode()
+    if demo:
+        return {
+            "demo": True,
+            "orders_n": 50_000,
+            "customers_n": 10_000,
+            "products_n": 1_000,
+            "reviews_n": 20_000,
+            "order_items_n": 50_000,
+            "stream_batches": 3,
+            "stream_batch_size": 500,
+            "ner_sample_size": 200,
+        }
+    return {
+        "demo": False,
+        "orders_n": 500_000,
+        "customers_n": 100_000,
+        "products_n": 10_000,
+        "reviews_n": 200_000,
+        "order_items_n": 500_000,
+        "stream_batches": 10,
+        "stream_batch_size": 2_000,
+        "ner_sample_size": 10_000,
+    }
+
 
 # ---------------------------------------------------------------------------
 # Default arguments
@@ -46,30 +88,31 @@ DATA_ROOT = "/opt/framework/data"
 # 1. Generate Synthetic Data (large-scale, realistic)
 # ---------------------------------------------------------------------------
 def _generate_synthetic_data(**context):
-    """Generate large-scale synthetic e-commerce data with real-world
-    scenarios: seasonal patterns, fraud, PII leakage, duplicates,
-    anomalies, and late-arriving data.
-    """
+    """Generate synthetic e-commerce data — volume depends on demo_mode."""
     from src.utils.data_generator import generate_all
 
+    cfg = _get_pipeline_config()
+    mode_label = "DEMO (fast)" if cfg["demo"] else "FULL-SCALE"
+
     print("=" * 70)
-    print("  GENERATING LARGE-SCALE SYNTHETIC DATA")
+    print(f"  GENERATING SYNTHETIC DATA  [{mode_label}]")
+    print(f"  Orders: {cfg['orders_n']:,}  Customers: {cfg['customers_n']:,}")
+    print(f"  Products: {cfg['products_n']:,}  Reviews: {cfg['reviews_n']:,}")
     print("  Injected scenarios: festival spikes, fraud patterns,")
-    print("  PII in free-text, 3% duplicate customers, value anomalies,")
-    print("  late-arriving data, null spikes")
+    print("  PII in free-text, 3% duplicate customers, value anomalies")
     print("=" * 70)
 
     generate_all(
         output_dir=f"{DATA_ROOT}/raw",
-        customers_n=100_000,
-        products_n=10_000,
-        orders_n=500_000,
-        reviews_n=200_000,
-        order_items_n=500_000,
+        customers_n=cfg["customers_n"],
+        products_n=cfg["products_n"],
+        orders_n=cfg["orders_n"],
+        reviews_n=cfg["reviews_n"],
+        order_items_n=cfg["order_items_n"],
         file_format="parquet",
     )
 
-    print("[generate_data] ✓ All datasets generated successfully")
+    print(f"[generate_data] ✓ All datasets generated successfully [{mode_label}]")
 
 
 # ---------------------------------------------------------------------------
@@ -121,20 +164,27 @@ def _run_streaming_ingestion(**context):
     checkpoint_dir = f"{DATA_ROOT}/streaming/_checkpoints"
     bronze_path = f"{DATA_ROOT}/bronze/clickstream"
 
+    cfg = _get_pipeline_config()
+    n_batches = cfg["stream_batches"]
+    batch_size = cfg["stream_batch_size"]
+    total_events = n_batches * batch_size
+    mode_label = "DEMO" if cfg["demo"] else "FULL-SCALE"
+
     print("=" * 70)
-    print("  REAL-TIME STREAMING INGESTION")
-    print("  Producing 10 micro-batches × 2,000 events = 20,000 events")
+    print(f"  REAL-TIME STREAMING INGESTION  [{mode_label}]")
+    print(f"  Producing {n_batches} micro-batches × {batch_size:,} events "
+          f"= {total_events:,} events")
     print("  5% PII injection in search queries")
     print("=" * 70)
 
     # Produce micro-batches first
-    for i in range(10):
+    for i in range(n_batches):
         path = write_micro_batch(
             landing_dir=landing_dir,
-            batch_size=2000,
+            batch_size=batch_size,
             inject_pii_pct=0.05,
         )
-        print(f"[streaming] Produced batch {i+1}/10 → {path}")
+        print(f"[streaming] Produced batch {i+1}/{n_batches} → {path}")
 
     # Now consume via Structured Streaming
     governor = StreamingGovernor(
@@ -568,9 +618,14 @@ def _pii_scan_summary(**context):
         )
         ner_status = "DISABLED (fallback to regex-only)"
 
+    cfg = _get_pipeline_config()
+    ner_sample = cfg["ner_sample_size"]
+    mode_label = "DEMO" if cfg["demo"] else "FULL-SCALE"
+
     print("=" * 70)
-    print("  PII DETECTION SUMMARY (Silver Layer)")
+    print(f"  PII DETECTION SUMMARY (Silver Layer)  [{mode_label}]")
     print(f"  NER Model: {ner_status}")
+    print(f"  Sample size: {ner_sample:,} texts per table")
     print("=" * 70)
 
     tables_to_scan = {
@@ -586,7 +641,7 @@ def _pii_scan_summary(**context):
     for table, columns in tables_to_scan.items():
         try:
             df = spark.read.format("delta").load(f"{DATA_ROOT}/silver/{table}")
-            sample = df.limit(10000).toPandas()
+            sample = df.limit(ner_sample).toPandas()
             for col in columns:
                 if col not in sample.columns:
                     continue
@@ -619,7 +674,7 @@ def _pii_scan_summary(**context):
                         ))
                 if col_pii_count > 0:
                     print(f"  {table}.{col}: {col_pii_count} PII instances "
-                          f"found in 10K sample")
+                          f"found in {ner_sample:,}-row sample")
                     print(f"    Types: {', '.join(sorted(pii_types_found))}")
                     total_pii += col_pii_count
                 else:
