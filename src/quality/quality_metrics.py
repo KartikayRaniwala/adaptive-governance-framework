@@ -177,12 +177,16 @@ class QualityMetrics:
         validity_rules: Optional[Dict[str, str]] = None,
         consistency_rules: Optional[List[Dict]] = None,
         timestamp_col: Optional[str] = None,
+        sla_hours: float = 24.0,
         weights: Optional[Dict[str, float]] = None,
     ) -> Dict:
         """Compute a weighted overall DQ score across all dimensions.
 
         Parameters
         ----------
+        sla_hours : float
+            Service-level window for the timeliness dimension (default 24 h).
+            For historical / demo data use a large value so all records pass.
         weights : dict | None
             ``{dimension: weight}`` — must sum to 1.0.
             Default equal weighting across available dimensions.
@@ -206,7 +210,7 @@ class QualityMetrics:
 
         # Timeliness
         if timestamp_col:
-            ti = self.timeliness(df, timestamp_col)
+            ti = self.timeliness(df, timestamp_col, sla_hours=sla_hours)
             scores["timeliness"] = ti["timeliness_pct"]
         else:
             scores["timeliness"] = 100.0
