@@ -99,10 +99,11 @@ class AdaptiveDQScorer:
 
         if len(recent) < 3:
             logger.info(
-                "Adaptive threshold: <3 history points — using default 85.0"
+                "Adaptive threshold: <3 history points — using min_threshold {:.1f}",
+                self.min_threshold,
             )
             return {
-                "threshold": 85.0,
+                "threshold": self.min_threshold,
                 "rolling_mean": None,
                 "rolling_std": None,
                 "history_count": len(recent),
